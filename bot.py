@@ -16,7 +16,6 @@ def gen_markup(id):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
-
     prize_id = call.data
     user_id = call.message.chat.id
 
@@ -24,18 +23,18 @@ def callback_query(call):
     with open(f'img/{img}', 'rb') as photo:
         bot.send_photo(user_id, photo)
 
-
 def send_message():
-    prize_id, img = manager.get_random_prize()[:2]
-    manager.mark_prize_used(prize_id)
-    hide_img(img)
-    for user in manager.get_users():
-        with open(f'hidden_img/{img}', 'rb') as photo:
-            bot.send_photo(user, photo, reply_markup=gen_markup(id = prize_id))
-        
+    prize = manager.get_random_prize()
+    if prize:
+        prize_id, img = prize[:2]
+        manager.mark_prize_used(prize_id)
+        hide_img(img)
+        for user in manager.get_users():
+            with open(f'hidden_img/{img}', 'rb') as photo:
+                bot.send_photo(user, photo, reply_markup=gen_markup(id=prize_id))
 
 def shedule_thread():
-    schedule.every().minute.do(send_message) # Здесь ты можешь задать периодичность отправки картинок
+    schedule.every().hour.do(send_message)
     while True:
         schedule.run_pending()
         time.sleep(1)
@@ -43,18 +42,14 @@ def shedule_thread():
 @bot.message_handler(commands=['start'])
 def handle_start(message):
     user_id = message.chat.id
-    if user_id in manager.get_users():
-        bot.reply_to(message, "Ты уже зарегестрирован!")
-    else:
-        manager.add_user(user_id, message.from_user.username)
-        bot.reply_to(message, """Привет! Добро пожаловать! 
+    user_name = message.from_user.username
+    manager.add_user(user_id, user_name)
+    bot.reply_to(message, """Привет! Добро пожаловать! 
 Тебя успешно зарегистрировали!
 Каждый час тебе будут приходить новые картинки и у тебя будет шанс их получить!
 Для этого нужно быстрее всех нажать на кнопку 'Получить!'
 
 Только три первых пользователя получат картинку!)""")
-        
-
 
 def polling_thread():
     bot.polling(none_stop=True)
@@ -64,8 +59,10 @@ if __name__ == '__main__':
     manager.create_tables()
 
     polling_thread = threading.Thread(target=polling_thread)
-    polling_shedule  = threading.Thread(target=shedule_thread)
+    polling_shedule = threading.Thread(target=shedule_thread)
 
     polling_thread.start()
     polling_shedule.start()
-  
+
+    polling_thread.join()
+    polling_shedule.join()
